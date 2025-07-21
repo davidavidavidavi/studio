@@ -1,3 +1,4 @@
+
 'use server'
 
 import { redirect } from 'next/navigation'
@@ -53,10 +54,42 @@ function createTimeSlots(timeStrings: string[]): TimeSlot[] {
   }));
 }
 
+function formatTime(date: Date) {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
-export async function createRoom(timeStrings?: string[]) {
+function generateTimeSlots(startTime: number, endTime: number, duration: number): string[] {
+    const slots: string[] = [];
+    const startDate = new Date();
+    startDate.setHours(startTime, 0, 0, 0);
+
+    const endDate = new Date();
+    endDate.setHours(endTime, 0, 0, 0);
+
+    let current = new Date(startDate);
+
+    while (current.getTime() < endDate.getTime()) {
+        const slotEnd = new Date(current.getTime() + duration * 60000);
+        if (slotEnd.getTime() > endDate.getTime()) break;
+        slots.push(`${formatTime(current)} - ${formatTime(slotEnd)}`);
+        current = slotEnd;
+    }
+    return slots;
+}
+
+export async function createRoom(data?: { timeRange?: [number, number], duration?: number, timeStrings?: string[]}) {
   const pin = generatePin();
-  const timeSlots = createTimeSlots(timeStrings && timeStrings.length > 0 ? timeStrings : defaultTimeStrings);
+  let timeSlots: TimeSlot[];
+
+  if (data?.timeStrings && data.timeStrings.length > 0) {
+    timeSlots = createTimeSlots(data.timeStrings);
+  } else if (data?.timeRange && data.duration) {
+    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration);
+    timeSlots = createTimeSlots(timeStrings);
+  } else {
+    timeSlots = createTimeSlots(defaultTimeStrings);
+  }
+  
   const newRoom: Room = {
     pin,
     timeSlots,

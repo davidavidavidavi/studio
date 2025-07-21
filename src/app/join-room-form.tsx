@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState, useTransition } from 'react';
@@ -8,19 +9,19 @@ import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createRoom } from './actions';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
-const formSchema = z.object({
+const pinFormSchema = z.object({
   pin: z.string().length(4, "PIN must be 4 characters.").regex(/^[a-zA-Z0-9]{4}$/, "PIN must be alphanumeric."),
 });
 
 const timeSlotsSchema = z.object({
-  timeSlots: z.string().min(1, 'Please provide at least one time slot.'),
+  timeRange: z.array(z.number()).length(2),
+  duration: z.number().min(5, "Duration must be at least 5 minutes.").max(120, "Duration can be at most 120 minutes."),
 });
 
 export default function JoinRoomForm() {
@@ -28,8 +29,8 @@ export default function JoinRoomForm() {
   const [isPending, startTransition] = useTransition();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const pinForm = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const pinForm = useForm<z.infer<typeof pinFormSchema>>({
+    resolver: zodResolver(pinFormSchema),
     defaultValues: {
       pin: "",
     },
@@ -38,18 +39,18 @@ export default function JoinRoomForm() {
   const timeSlotsForm = useForm<z.infer<typeof timeSlotsSchema>>({
     resolver: zodResolver(timeSlotsSchema),
     defaultValues: {
-      timeSlots: "9:00 - 9:30 AM\n9:30 - 10:00 AM\n10:00 - 10:30 AM\n10:30 - 11:00 AM\n11:00 - 11:30 AM\n11:30 - 12:00 PM\n1:00 - 1:30 PM\n1:30 - 2:00 PM\n2:00 - 2:30 PM\n2:30 - 3:00 PM\n3:00 - 3:30 PM\n3:30 - 4:00 PM",
+      timeRange: [9, 17], // 9 AM to 5 PM
+      duration: 30,
     },
   });
 
-  function onPinSubmit(values: z.infer<typeof formSchema>) {
+  function onPinSubmit(values: z.infer<typeof pinFormSchema>) {
     router.push(`/${values.pin.toUpperCase()}`);
   }
 
   function onTimeSlotsSubmit(values: z.infer<typeof timeSlotsSchema>) {
     startTransition(async () => {
-      const timeSlots = values.timeSlots.split('\n').filter(ts => ts.trim() !== '');
-      await createRoom(timeSlots);
+      await createRoom(values);
     });
   }
   
@@ -62,6 +63,8 @@ export default function JoinRoomForm() {
       await createRoom();
     });
   }
+  
+  const timeRange = timeSlotsForm.watch('timeRange');
 
   return (
     <>
@@ -124,29 +127,52 @@ export default function JoinRoomForm() {
           <DialogHeader>
             <DialogTitle>Configure Time Slots</DialogTitle>
             <DialogDescription>
-              Enter the time slots you want to make available for voting, one per line.
+              Use the slider to set the start and end times, and specify the duration for each meeting slot.
             </DialogDescription>
           </DialogHeader>
           <Form {...timeSlotsForm}>
-            <form onSubmit={timeSlotsForm.handleSubmit(onTimeSlotsSubmit)} className="space-y-4">
+            <form onSubmit={timeSlotsForm.handleSubmit(onTimeSlotsSubmit)} className="space-y-6">
               <FormField
                 control={timeSlotsForm.control}
-                name="timeSlots"
+                name="timeRange"
                 render={({ field }) => (
                   <FormItem>
-                    <Label htmlFor="time-slots">Available Times</Label>
+                    <FormLabel>Time Range (24h format)</FormLabel>
                     <FormControl>
-                      <Textarea
-                        id="time-slots"
-                        rows={12}
-                        placeholder="e.g. 9:00 - 10:00 AM"
-                        {...field}
+                      <Slider
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        min={0}
+                        max={24}
+                        step={1}
                       />
+                    </FormControl>
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>{field.value[0]}:00</span>
+                      <span>{field.value[1]}:00</span>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={timeSlotsForm.control}
+                name="duration"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Slot Duration (minutes)</FormLabel>
+                    <FormControl>
+                       <Input 
+                          type="number"
+                          {...field}
+                          onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)}
+                          min="5"
+                          max="120"
+                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+                />
               <DialogFooter>
                 <Button type="submit" disabled={isPending}>
                   {isPending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
