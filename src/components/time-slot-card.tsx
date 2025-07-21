@@ -1,10 +1,10 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { selectTimeSlot } from '@/app/actions';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Users, Clock, Loader2 } from 'lucide-react';
+import { Users, Clock, Loader2, CheckCircle } from 'lucide-react';
 import type { TimeSlot } from '@/app/actions';
 
 interface TimeSlotCardProps {
@@ -14,14 +14,44 @@ interface TimeSlotCardProps {
 
 export default function TimeSlotCard({ pin, timeSlot }: TimeSlotCardProps) {
   const [isPending, startTransition] = useTransition();
+  const [hasVoted, setHasVoted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const storageKey = `freakmeet-votes-${pin}`;
+
+  useEffect(() => {
+    try {
+      const votes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      if (votes.includes(timeSlot.id)) {
+        setHasVoted(true);
+      }
+    } catch (e) {
+      console.error('Failed to parse votes from localStorage', e);
+    }
+    setIsLoading(false);
+  }, [pin, timeSlot.id, storageKey]);
+
 
   const handleSelect = () => {
-    startTransition(() => {
-      selectTimeSlot(pin, timeSlot.id);
+    if (hasVoted || isPending || isLoading) return;
+
+    startTransition(async () => {
+      const result = await selectTimeSlot(pin, timeSlot.id);
+      if (result.success) {
+        try {
+          const votes = JSON.parse(localStorage.getItem(storageKey) || '[]');
+          votes.push(timeSlot.id);
+          localStorage.setItem(storageKey, JSON.stringify(votes));
+          setHasVoted(true);
+        } catch (e) {
+          console.error("Failed to save vote to localStorage", e);
+        }
+      }
     });
   };
 
-  const getCardColor = (selections: number) => {
+  const getCardColor = (selections: number, voted: boolean) => {
+    if (voted) return 'bg-secondary/70';
     if (selections === 0) return 'bg-card/80 hover:bg-card';
     if (selections <= 2) return 'bg-accent/30 hover:bg-accent/40';
     if (selections <= 5) return 'bg-accent/60 hover:bg-accent/70';
@@ -29,32 +59,35 @@ export default function TimeSlotCard({ pin, timeSlot }: TimeSlotCardProps) {
     return 'bg-primary hover:bg-primary/90';
   };
   
-  const getTextColor = (selections: number) => {
+  const getTextColor = (selections: number, voted: boolean) => {
+    if (voted) return 'text-secondary-foreground';
     if (selections > 5) return 'text-primary-foreground';
     return 'text-card-foreground';
   }
 
+  const isDisabled = hasVoted || isPending || isLoading;
+
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all duration-300 ease-in-out transform hover:scale-105 shadow-md hover:shadow-xl',
-        getCardColor(timeSlot.selections),
-        isPending && 'cursor-not-allowed opacity-70 scale-100'
+        'transition-all duration-300 ease-in-out shadow-md',
+        getCardColor(timeSlot.selections, hasVoted),
+        isDisabled ? 'cursor-not-allowed opacity-80' : 'cursor-pointer transform hover:scale-105 hover:shadow-xl'
       )}
-      onClick={!isPending ? handleSelect : undefined}
-      aria-disabled={isPending}
+      onClick={handleSelect}
+      aria-disabled={isDisabled}
       role="button"
-      tabIndex={0}
+      tabIndex={isDisabled ? -1 : 0}
       onKeyDown={(e) => {
-        if((e.key === 'Enter' || e.key === ' ') && !isPending) {
+        if((e.key === 'Enter' || e.key === ' ') && !isDisabled) {
           e.preventDefault();
           handleSelect();
         }
       }}
     >
-      <CardContent className={cn('flex flex-col items-center justify-center p-6 space-y-3', getTextColor(timeSlot.selections))}>
+      <CardContent className={cn('flex flex-col items-center justify-center p-6 space-y-3', getTextColor(timeSlot.selections, hasVoted))}>
         <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
+          {hasVoted ? <CheckCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
           <p className="text-lg font-semibold text-center">{timeSlot.time}</p>
         </div>
         <div className="flex items-center gap-2 font-medium text-sm">
