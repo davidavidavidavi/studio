@@ -49,6 +49,7 @@ function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
 function generateTimeSlots(startTime: number, endTime: number, duration: number, forDate: Date): string[] {
     const slots: string[] = [];
 
+    // Create start and end dates in local time based on the provided date and hours
     const startDate = new Date(forDate);
     startDate.setHours(startTime, 0, 0, 0);
 
@@ -58,15 +59,13 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number,
     let current = new Date(startDate);
 
     while (current.getTime() < endDate.getTime()) {
-        const slotEnd = new Date(current.getTime() + duration * 60000);
-        if (slotEnd.getTime() > endDate.getTime()) break;
-        
-        // We generate the string representation in UTC to be stored,
-        // the client will format it to local time.
-        const hours = current.getUTCHours().toString().padStart(2, '0');
-        const minutes = current.getUTCMinutes().toString().padStart(2, '0');
+        // Format the time in HH:mm format based on local time
+        const hours = current.getHours().toString().padStart(2, '0');
+        const minutes = current.getMinutes().toString().padStart(2, '0');
         slots.push(`${hours}:${minutes}`);
-        current = slotEnd;
+        
+        // Increment current time by the duration
+        current = new Date(current.getTime() + duration * 60000);
     }
     return slots;
 }
@@ -76,26 +75,23 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
   const roomRef = doc(roomsCollection, upperCasePin);
   
   let timeSlots: TimeSlot[];
-  // The date string from the client includes timezone info.
-  // new Date() will correctly parse it into a Date object representing that point in time.
+  // The date string from the client is parsed here.
   const roomDate = data?.date ? new Date(data.date) : new Date();
 
-  // We want to preserve the YYYY-MM-DD from the user's local perspective for display purposes.
+  // This creates a "clean" date object (YYYY-MM-DD) without time parts, in the server's local context.
+  // This is important for generating slots for the intended day.
   const localDate = new Date(roomDate.getFullYear(), roomDate.getMonth(), roomDate.getDate());
 
 
   if (data?.timeStrings && data.timeStrings.length > 0) {
-    // This path is used for default room creation, let's make it use local time too.
-    const forDate = new Date(localDate);
-    timeSlots = createTimeSlots(data.timeStrings, forDate);
+    // This path is for default room creation.
+    timeSlots = createTimeSlots(data.timeStrings, localDate);
   } else if (data?.timeRange && data.duration) {
-    const forDate = new Date(localDate);
-    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, forDate);
-    timeSlots = createTimeSlots(timeStrings, forDate);
+    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, localDate);
+    timeSlots = createTimeSlots(timeStrings, localDate);
   } else {
     // Default room creation
-    const forDate = new Date(localDate);
-    timeSlots = createTimeSlots(defaultTimeStrings, forDate);
+    timeSlots = createTimeSlots(defaultTimeStrings, localDate);
   }
   
   const newRoom: Room = {
@@ -125,6 +121,8 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
   const roomRef = doc(roomsCollection, pin.toUpperCase());
 
   try {
+    let hasVoted: boolean | undefined = undefined;
+
     await runTransaction(db, async (transaction) => {
       const roomDoc = await transaction.get(roomRef);
       if (!roomDoc.exists()) {
@@ -138,31 +136,27 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
         throw "Time slot not found!";
       }
 
-      const timeSlot = roomData.timeSlots[timeSlotIndex];
       const newTimeSlots = [...roomData.timeSlots];
-      const hasVoted = timeSlot.voters?.includes(userId);
+      const timeSlot = newTimeSlots[timeSlotIndex];
+      
+      const userHasVotedForSlot = timeSlot.voters?.includes(userId);
+      hasVoted = !userHasVotedForSlot; // This will be the new voted state
 
-      if (hasVoted) {
+      if (userHasVotedForSlot) {
         // User has already voted, so un-vote
-        newTimeSlots[timeSlotIndex] = {
-          ...timeSlot,
-          selections: timeSlot.selections - 1,
-          voters: timeSlot.voters.filter(voterId => voterId !== userId)
-        };
+        timeSlot.selections = Math.max(0, timeSlot.selections - 1);
+        timeSlot.voters = timeSlot.voters.filter(voterId => voterId !== userId);
       } else {
         // User has not voted, so add vote
-        newTimeSlots[timeSlotIndex] = {
-          ...timeSlot,
-          selections: timeSlot.selections + 1,
-          voters: [...(timeSlot.voters || []), userId]
-        };
+        timeSlot.selections = timeSlot.selections + 1;
+        timeSlot.voters = [...(timeSlot.voters || []), userId];
       }
 
       transaction.update(roomRef, { timeSlots: newTimeSlots });
     });
 
     revalidatePath(`/${pin}`);
-    return { success: true, voted: !hasVoted };
+    return { success: true, voted: hasVoted };
   } catch (e) {
     console.error("Transaction failed: ", e);
     return { success: false, message: 'An error occurred while voting.' };
