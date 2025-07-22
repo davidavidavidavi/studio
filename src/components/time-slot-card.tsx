@@ -14,22 +14,30 @@ interface TimeSlotCardProps {
   duration: number; // Duration of the slot in minutes
 }
 
+// A simple way to get a unique-ish ID for the user
+function getUserId() {
+  let userId = localStorage.getItem('freakmeet-userId');
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem('freakmeet-userId', userId);
+  }
+  return userId;
+}
+
 export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardProps) {
   const [isPending, startTransition] = useTransition();
   const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [displayTime, setDisplayTime] = useState('');
+  const [userId, setUserId] = useState('');
 
-  const storageKey = `freakmeet-votes-${pin}`;
 
   useEffect(() => {
-    try {
-      const votes = JSON.parse(localStorage.getItem(storageKey) || '[]');
-      if (votes.includes(timeSlot.id)) {
-        setHasVoted(true);
-      }
-    } catch (e) {
-      console.error('Failed to parse votes from localStorage', e);
+    const currentUserId = getUserId();
+    setUserId(currentUserId);
+    
+    if (timeSlot.voters?.includes(currentUserId)) {
+      setHasVoted(true);
     }
     
     // Format time on client-side to use local timezone
@@ -43,23 +51,16 @@ export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardPr
     setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
     
     setIsLoading(false);
-  }, [pin, timeSlot.id, timeSlot.time, duration, storageKey]);
+  }, [pin, timeSlot.id, timeSlot.time, timeSlot.voters, duration]);
 
 
   const handleSelect = () => {
     if (hasVoted || isPending || isLoading) return;
 
     startTransition(async () => {
-      const result = await selectTimeSlot(pin, timeSlot.id);
+      const result = await selectTimeSlot(pin, timeSlot.id, userId);
       if (result.success) {
-        try {
-          const votes = JSON.parse(localStorage.getItem(storageKey) || '[]');
-          votes.push(timeSlot.id);
-          localStorage.setItem(storageKey, JSON.stringify(votes));
-          setHasVoted(true);
-        } catch (e) {
-          console.error("Failed to save vote to localStorage", e);
-        }
+        setHasVoted(true); // Visually update immediately
       }
     });
   };

@@ -3,12 +3,15 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { db } from '@/lib/firebase';
+import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 
 // Define types
 export interface TimeSlot {
   id: string;
   time: string; // Stored as ISO 8601 string in UTC
   selections: number;
+  voters: string[];
 }
 
 export interface Room {
@@ -16,8 +19,7 @@ export interface Room {
   timeSlots: TimeSlot[];
 }
 
-// In-memory store
-const rooms = new Map<string, Room>();
+const roomsCollection = collection(db, 'rooms');
 
 const defaultTimeStrings: string[] = [
     '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
@@ -37,6 +39,7 @@ function createTimeSlots(timeStrings: string[]): TimeSlot[] {
             id: `${index + 1}`,
             time: date.toISOString(), // Store as ISO string (UTC)
             selections: 0,
+            voters: [],
         };
     });
 }
@@ -68,6 +71,8 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number)
 
 export async function createRoom(pin: string, data?: { timeRange?: [number, number], duration?: number, timeStrings?: string[]}) {
   const upperCasePin = pin.toUpperCase();
+  const roomRef = doc(roomsCollection, upperCasePin);
+  
   let timeSlots: TimeSlot[];
 
   if (data?.timeStrings && data.timeStrings.length > 0) {
@@ -83,37 +88,69 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
     pin: upperCasePin,
     timeSlots,
   };
-  rooms.set(upperCasePin, newRoom);
+
+  await setDoc(roomRef, newRoom);
   redirect(`/${upperCasePin}`);
 }
 
 export async function getRoom(pin: string): Promise<Room | null> {
     const upperCasePin = pin.toUpperCase();
-    if (rooms.has(upperCasePin)) {
-        return rooms.get(upperCasePin)!;
+    const roomRef = doc(roomsCollection, upperCasePin);
+    const roomSnap = await getDoc(roomRef);
+
+    if (roomSnap.exists()) {
+        return roomSnap.data() as Room;
     }
-    
-    // If room doesn't exist, create a default one and store it.
+
+    // To prevent 404s, let's create a default room if it doesn't exist
     const timeSlots = createTimeSlots(defaultTimeStrings);
     const newRoom: Room = {
       pin: upperCasePin,
       timeSlots,
     };
-    rooms.set(upperCasePin, newRoom);
+    await setDoc(roomRef, newRoom);
     return newRoom;
 }
 
 
-export async function selectTimeSlot(pin: string, timeSlotId: string) {
-  const room = rooms.get(pin.toUpperCase());
-  if (room) {
-    const timeSlot = room.timeSlots.find(ts => ts.id === timeSlotId);
-    if (timeSlot) {
-      timeSlot.selections += 1;
-      rooms.set(pin.toUpperCase(), room);
-      revalidatePath(`/${pin}`);
-      return { success: true };
-    }
+export async function selectTimeSlot(pin: string, timeSlotId: string, userId: string) {
+  const roomRef = doc(roomsCollection, pin.toUpperCase());
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const roomDoc = await transaction.get(roomRef);
+      if (!roomDoc.exists()) {
+        throw "Document does not exist!";
+      }
+
+      const roomData = roomDoc.data() as Room;
+      
+      const timeSlotIndex = roomData.timeSlots.findIndex(ts => ts.id === timeSlotId);
+      if (timeSlotIndex === -1) {
+        throw "Time slot not found!";
+      }
+
+      const timeSlot = roomData.timeSlots[timeSlotIndex];
+      if (timeSlot.voters?.includes(userId)) {
+        // User has already voted for this slot, so we do nothing.
+        return;
+      }
+      
+      // Create a new array with the updated timeslot
+      const newTimeSlots = [...roomData.timeSlots];
+      newTimeSlots[timeSlotIndex] = {
+        ...timeSlot,
+        selections: timeSlot.selections + 1,
+        voters: [...(timeSlot.voters || []), userId]
+      };
+
+      transaction.update(roomRef, { timeSlots: newTimeSlots });
+    });
+
+    revalidatePath(`/${pin}`);
+    return { success: true };
+  } catch (e) {
+    console.error("Transaction failed: ", e);
+    return { success: false, message: 'An error occurred while voting.' };
   }
-  return { success: false, message: 'Room or time slot not found' };
 }
