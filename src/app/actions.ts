@@ -90,7 +90,7 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
   };
 
   await setDoc(roomRef, newRoom);
-  redirect(`/${upperCasePin}`);
+  return upperCasePin;
 }
 
 export async function getRoom(pin: string): Promise<Room | null> {
@@ -101,8 +101,8 @@ export async function getRoom(pin: string): Promise<Room | null> {
     if (roomSnap.exists()) {
         return roomSnap.data() as Room;
     }
-
-    // To prevent 404s, let's create a default room if it doesn't exist
+    
+    // To handle cases where a user navigates to a PIN that doesn't exist yet.
     const timeSlots = createTimeSlots(defaultTimeStrings);
     const newRoom: Room = {
       pin: upperCasePin,

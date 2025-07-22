@@ -61,7 +61,8 @@ export default function JoinRoomForm() {
   function onTimeSlotsSubmit(values: z.infer<typeof timeSlotsSchema>) {
     startTransition(async () => {
       const pin = generatePin();
-      await createRoom(pin, values);
+      const newPin = await createRoom(pin, values);
+      router.push(`/${newPin}`);
     });
   }
   
@@ -72,7 +73,8 @@ export default function JoinRoomForm() {
   const handleCreateDefaultRoom = () => {
     startTransition(async () => {
       const pin = generatePin();
-      await createRoom(pin);
+      const newPin = await createRoom(pin);
+      router.push(`/${newPin}`);
     });
   }
   
