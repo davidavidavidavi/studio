@@ -78,6 +78,7 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
               pin={room.pin}
               timeSlot={slot}
               duration={duration}
+              roomDate={roomDate}
             />
           ))}
         </div>

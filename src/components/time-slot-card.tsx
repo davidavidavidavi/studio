@@ -12,6 +12,7 @@ interface TimeSlotCardProps {
   pin: string;
   timeSlot: TimeSlot;
   duration: number; // Duration of the slot in minutes
+  roomDate: Date; // Add this prop to get the correct date for the slot
 }
 
 // A simple way to get a unique-ish ID for the user
@@ -25,7 +26,7 @@ function getUserId() {
   return userId;
 }
 
-export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardProps) {
+export default function TimeSlotCard({ pin, timeSlot, duration, roomDate }: TimeSlotCardProps) {
   const [isPending, startTransition] = useTransition();
   const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,11 +44,9 @@ export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardPr
       setHasVoted(false);
     }
     
-    // Interpret timeSlot.time as a local time string (e.g., '09:00') for today
-    // and display it as local time for all users
+    // Use roomDate for the correct day
     const [hours, minutes] = timeSlot.time.split(':').map(Number);
-    const now = new Date();
-    const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+    const startTime = new Date(roomDate.getFullYear(), roomDate.getMonth(), roomDate.getDate(), hours, minutes, 0, 0);
     const endTime = new Date(startTime.getTime() + duration * 60000);
     
     const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
@@ -60,7 +59,7 @@ export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardPr
     }
     
     setIsLoading(false);
-  }, [timeSlot.voters, timeSlot.time, duration]);
+  }, [timeSlot.voters, timeSlot.time, duration, roomDate]);
 
 
   const handleSelect = () => {
