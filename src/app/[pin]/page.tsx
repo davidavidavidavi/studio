@@ -1,3 +1,4 @@
+
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getRoom } from '../actions';
@@ -13,6 +14,16 @@ export async function generateMetadata({ params }: { params: { pin: string } }):
   };
 }
 
+// A helper to calculate duration between time slots
+function calculateDuration(timeSlots: { time: string }[]): number {
+  if (timeSlots.length < 2) {
+    return 30; // Default duration
+  }
+  const first = new Date(timeSlots[0].time).getTime();
+  const second = new Date(timeSlots[1].time).getTime();
+  return (second - first) / 60000; // duration in minutes
+}
+
 export default async function RoomPage({ params }: { params: { pin: string } }) {
   const pin = params.pin.toUpperCase();
   const room = await getRoom(pin);
@@ -22,6 +33,7 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
   }
   
   const totalSelections = room.timeSlots.reduce((sum, slot) => sum + slot.selections, 0);
+  const duration = calculateDuration(room.timeSlots);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -56,6 +68,7 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
               key={slot.id}
               pin={room.pin}
               timeSlot={slot}
+              duration={duration}
             />
           ))}
         </div>

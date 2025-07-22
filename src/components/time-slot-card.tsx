@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useTransition } from 'react';
@@ -10,12 +11,14 @@ import type { TimeSlot } from '@/app/actions';
 interface TimeSlotCardProps {
   pin: string;
   timeSlot: TimeSlot;
+  duration: number; // Duration of the slot in minutes
 }
 
-export default function TimeSlotCard({ pin, timeSlot }: TimeSlotCardProps) {
+export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardProps) {
   const [isPending, startTransition] = useTransition();
   const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [displayTime, setDisplayTime] = useState('');
 
   const storageKey = `freakmeet-votes-${pin}`;
 
@@ -28,8 +31,19 @@ export default function TimeSlotCard({ pin, timeSlot }: TimeSlotCardProps) {
     } catch (e) {
       console.error('Failed to parse votes from localStorage', e);
     }
+    
+    // Format time on client-side to use local timezone
+    const startTime = new Date(timeSlot.time);
+    const endTime = new Date(startTime.getTime() + duration * 60000);
+    
+    const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
+    const formattedStartTime = startTime.toLocaleTimeString([], options);
+    const formattedEndTime = endTime.toLocaleTimeString([], options);
+    
+    setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
+    
     setIsLoading(false);
-  }, [pin, timeSlot.id, storageKey]);
+  }, [pin, timeSlot.id, timeSlot.time, duration, storageKey]);
 
 
   const handleSelect = () => {
@@ -88,7 +102,7 @@ export default function TimeSlotCard({ pin, timeSlot }: TimeSlotCardProps) {
       <CardContent className={cn('flex flex-col items-center justify-center p-6 space-y-3', getTextColor(timeSlot.selections, hasVoted))}>
         <div className="flex items-center gap-2">
           {hasVoted ? <CheckCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
-          <p className="text-lg font-semibold text-center">{timeSlot.time}</p>
+          <p className="text-lg font-semibold text-center">{isLoading ? 'Loading...' : displayTime}</p>
         </div>
         <div className="flex items-center gap-2 font-medium text-sm">
           {isPending ? (

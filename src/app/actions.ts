@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache'
 // Define types
 export interface TimeSlot {
   id: string;
-  time: string;
+  time: string; // Stored as ISO 8601 string in UTC
   selections: number;
 }
 
@@ -32,46 +32,47 @@ function generatePin(): string {
 }
 
 const defaultTimeStrings: string[] = [
-    '9:00 - 9:30 AM',
-    '9:30 - 10:00 AM',
-    '10:00 - 10:30 AM',
-    '10:30 - 11:00 AM',
-    '11:00 - 11:30 AM',
-    '11:30 - 12:00 PM',
-    '1:00 - 1:30 PM',
-    '1:30 - 2:00 PM',
-    '2:00 - 2:30 PM',
-    '2:30 - 3:00 PM',
-    '3:00 - 3:30 PM',
-    '3:30 - 4:00 PM',
+    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
+    '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
 
 function createTimeSlots(timeStrings: string[]): TimeSlot[] {
-  return timeStrings.map((time, index) => ({
-    id: `${index + 1}`,
-    time,
-    selections: 0,
-  }));
-}
+    const today = new Date();
+    today.setSeconds(0, 0);
 
-function formatTime(date: Date) {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return timeStrings.map((time, index) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const date = new Date(today);
+        date.setHours(hours, minutes);
+
+        return {
+            id: `${index + 1}`,
+            time: date.toISOString(), // Store as ISO string (UTC)
+            selections: 0,
+        };
+    });
 }
 
 function generateTimeSlots(startTime: number, endTime: number, duration: number): string[] {
     const slots: string[] = [];
-    const startDate = new Date();
-    startDate.setHours(startTime, 0, 0, 0);
+    const today = new Date();
+    today.setSeconds(0,0);
 
-    const endDate = new Date();
-    endDate.setHours(endTime, 0, 0, 0);
+    const startDate = new Date(today);
+    startDate.setHours(startTime, 0);
+
+    const endDate = new Date(today);
+    endDate.setHours(endTime, 0);
 
     let current = new Date(startDate);
 
     while (current.getTime() < endDate.getTime()) {
         const slotEnd = new Date(current.getTime() + duration * 60000);
         if (slotEnd.getTime() > endDate.getTime()) break;
-        slots.push(`${formatTime(current)} - ${formatTime(slotEnd)}`);
+        
+        const hours = current.getHours().toString().padStart(2, '0');
+        const minutes = current.getMinutes().toString().padStart(2, '0');
+        slots.push(`${hours}:${minutes}`);
         current = slotEnd;
     }
     return slots;
