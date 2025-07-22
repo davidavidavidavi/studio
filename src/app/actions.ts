@@ -102,14 +102,7 @@ export async function getRoom(pin: string): Promise<Room | null> {
         return roomSnap.data() as Room;
     }
     
-    // To handle cases where a user navigates to a PIN that doesn't exist yet.
-    const timeSlots = createTimeSlots(defaultTimeStrings);
-    const newRoom: Room = {
-      pin: upperCasePin,
-      timeSlots,
-    };
-    await setDoc(roomRef, newRoom);
-    return newRoom;
+    return null;
 }
 
 
