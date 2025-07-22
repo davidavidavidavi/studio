@@ -43,12 +43,14 @@ export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardPr
       setHasVoted(false);
     }
     
-    // Format time on client-side to use local timezone
-    const startTime = new Date(timeSlot.time);
+    // Interpret timeSlot.time as a local time string (e.g., '09:00') for today
+    // and display it as local time for all users
+    const [hours, minutes] = timeSlot.time.split(':').map(Number);
+    const now = new Date();
+    const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
     const endTime = new Date(startTime.getTime() + duration * 60000);
     
     const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-    // To reliably get local time string, we need to ensure the browser environment is available
     if (typeof window !== 'undefined') {
       const formattedStartTime = startTime.toLocaleTimeString(navigator.language, options);
       const formattedEndTime = endTime.toLocaleTimeString(navigator.language, options);

@@ -9,7 +9,7 @@ import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion,
 // Define types
 export interface TimeSlot {
   id: string;
-  time: string; // Stored as ISO 8601 string in UTC
+  time: string; // Stored as local time string, e.g., '09:00'
   selections: number;
   voters: string[];
 }
@@ -30,24 +30,10 @@ const defaultTimeStrings: string[] = [
 // Function to create time slots from strings like '09:00'
 function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
     return timeStrings.map((time, index) => {
-        const [hours, minutes] = time.split(':').map(Number);
-
-        // Create a new Date object for the specific time slot in the user's local time zone
-        // by using the year, month, and day from forDate (interpreted in the user's local time)
-        // and the hours and minutes from the timeString.
-        const localDate = new Date(
-            forDate.getFullYear(),
-            forDate.getMonth(),
-            forDate.getDate(),
-            hours,
-            minutes,
-            0,
-            0
-        );
-
+        // No Date object needed; just store the local time string
         return {
             id: `${index + 1}`,
-            time: localDate.toISOString(), // Store as ISO string (UTC)
+            time: time, // Store as local time string
             selections: 0,
             voters: [],
         };
