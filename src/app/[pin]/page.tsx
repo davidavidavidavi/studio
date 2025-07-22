@@ -36,9 +36,9 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
   const totalSelections = room.timeSlots.reduce((sum, slot) => sum + slot.selections, 0);
   const duration = calculateDuration(room.timeSlots);
   
-  // The date is stored as 'YYYY-MM-DD'. We use parseISO to correctly handle it
-  // without timezone issues that `new Date()` can introduce.
-  const roomDate = parseISO(`${room.date}T00:00:00`);
+  // The date is stored as 'YYYY-MM-DD'. To avoid timezone issues when parsing,
+  // we explicitly treat it as a UTC date by appending 'T00:00:00Z'.
+  const roomDate = parseISO(`${room.date}T00:00:00Z`);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
