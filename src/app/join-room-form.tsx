@@ -6,20 +6,26 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { format } from "date-fns"
+import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createRoom } from './actions';
 import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
-import { Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const pinFormSchema = z.object({
   pin: z.string().length(4, "PIN must be 4 characters.").regex(/^[a-zA-Z0-9]{4}$/, "PIN must be alphanumeric."),
 });
 
 const timeSlotsSchema = z.object({
+  date: z.date(),
   timeRange: z.array(z.number()).length(2),
   duration: z.number().min(5, "Duration must be at least 5 minutes.").max(120, "Duration can be at most 120 minutes."),
 });
@@ -49,6 +55,7 @@ export default function JoinRoomForm() {
   const timeSlotsForm = useForm<z.infer<typeof timeSlotsSchema>>({
     resolver: zodResolver(timeSlotsSchema),
     defaultValues: {
+      date: new Date(),
       timeRange: [9, 17], // 9 AM to 5 PM
       duration: 30,
     },
@@ -61,7 +68,10 @@ export default function JoinRoomForm() {
   function onTimeSlotsSubmit(values: z.infer<typeof timeSlotsSchema>) {
     startTransition(async () => {
       const pin = generatePin();
-      const newPin = await createRoom(pin, values);
+      const newPin = await createRoom(pin, {
+        ...values,
+        date: values.date.toISOString(),
+      });
       router.push(`/${newPin}`);
     });
   }
@@ -141,11 +151,49 @@ export default function JoinRoomForm() {
           <DialogHeader>
             <DialogTitle>Configure Time Slots</DialogTitle>
             <DialogDescription>
-              Use the slider to set the start and end times, and specify the duration for each meeting slot.
+              Select a date, set the time range with the slider, and specify the duration for each meeting slot.
             </DialogDescription>
           </DialogHeader>
           <Form {...timeSlotsForm}>
             <form onSubmit={timeSlotsForm.handleSubmit(onTimeSlotsSubmit)} className="space-y-6">
+              <FormField
+                control={timeSlotsForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={timeSlotsForm.control}
                 name="timeRange"

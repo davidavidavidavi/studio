@@ -16,6 +16,7 @@ export interface TimeSlot {
 
 export interface Room {
   pin: string;
+  date: string; // Stored as ISO 8601 string (date part only, e.g., '2024-07-23')
   timeSlots: TimeSlot[];
 }
 
@@ -26,14 +27,14 @@ const defaultTimeStrings: string[] = [
     '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
 
-function createTimeSlots(timeStrings: string[]): TimeSlot[] {
-    const today = new Date();
+function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
+    const today = forDate;
     today.setSeconds(0, 0);
 
     return timeStrings.map((time, index) => {
         const [hours, minutes] = time.split(':').map(Number);
         const date = new Date(today);
-        date.setHours(hours, minutes);
+        date.setHours(hours, minutes, 0, 0);
 
         return {
             id: `${index + 1}`,
@@ -44,16 +45,16 @@ function createTimeSlots(timeStrings: string[]): TimeSlot[] {
     });
 }
 
-function generateTimeSlots(startTime: number, endTime: number, duration: number): string[] {
+function generateTimeSlots(startTime: number, endTime: number, duration: number, forDate: Date): string[] {
     const slots: string[] = [];
-    const today = new Date();
+    const today = forDate;
     today.setSeconds(0,0);
 
     const startDate = new Date(today);
-    startDate.setHours(startTime, 0);
+    startDate.setHours(startTime, 0, 0, 0);
 
     const endDate = new Date(today);
-    endDate.setHours(endTime, 0);
+    endDate.setHours(endTime, 0, 0, 0);
 
     let current = new Date(startDate);
 
@@ -69,23 +70,25 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number)
     return slots;
 }
 
-export async function createRoom(pin: string, data?: { timeRange?: [number, number], duration?: number, timeStrings?: string[]}) {
+export async function createRoom(pin: string, data?: { timeRange?: [number, number], duration?: number, timeStrings?: string[], date?: string }) {
   const upperCasePin = pin.toUpperCase();
   const roomRef = doc(roomsCollection, upperCasePin);
   
   let timeSlots: TimeSlot[];
+  const roomDate = data?.date ? new Date(data.date) : new Date();
 
   if (data?.timeStrings && data.timeStrings.length > 0) {
-    timeSlots = createTimeSlots(data.timeStrings);
+    timeSlots = createTimeSlots(data.timeStrings, roomDate);
   } else if (data?.timeRange && data.duration) {
-    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration);
-    timeSlots = createTimeSlots(timeStrings);
+    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, roomDate);
+    timeSlots = createTimeSlots(timeStrings, roomDate);
   } else {
-    timeSlots = createTimeSlots(defaultTimeStrings);
+    timeSlots = createTimeSlots(defaultTimeStrings, roomDate);
   }
   
   const newRoom: Room = {
     pin: upperCasePin,
+    date: roomDate.toISOString().split('T')[0], // Store date as YYYY-MM-DD
     timeSlots,
   };
 

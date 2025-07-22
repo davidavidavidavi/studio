@@ -4,8 +4,9 @@ import type { Metadata } from 'next';
 import { getRoom } from '../actions';
 import TimeSlotCard from '@/components/time-slot-card';
 import { Badge } from '@/components/ui/badge';
-import { Users, HandMetal } from 'lucide-react';
+import { Users, HandMetal, Calendar as CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 export async function generateMetadata({ params }: { params: { pin: string } }): Promise<Metadata> {
   return {
@@ -34,6 +35,9 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
   
   const totalSelections = room.timeSlots.reduce((sum, slot) => sum + slot.selections, 0);
   const duration = calculateDuration(room.timeSlots);
+  
+  // The date is stored as 'YYYY-MM-DD'. We need to add a time part to parse it correctly as a local date.
+  const roomDate = new Date(`${room.date}T00:00:00`);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -59,6 +63,10 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
       </header>
       <main className="container mx-auto p-4 md:p-6">
         <div className="mb-8 text-center">
+            <div className="mb-2 flex items-center justify-center gap-2 text-xl text-muted-foreground">
+              <CalendarIcon className="h-5 w-5" />
+              <time dateTime={room.date}>{format(roomDate, 'PPP')}</time>
+            </div>
             <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl font-headline">Select Your Time</h2>
             <p className="mt-2 text-muted-foreground">Click a slot to cast your vote. Popular times get hotter!</p>
         </div>
