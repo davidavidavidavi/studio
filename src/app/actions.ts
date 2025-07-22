@@ -28,15 +28,13 @@ const defaultTimeStrings: string[] = [
 ];
 
 function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
-    const today = forDate;
-    today.setSeconds(0, 0);
-
     return timeStrings.map((time, index) => {
         const [hours, minutes] = time.split(':').map(Number);
         
-        // Create a new Date object for each slot based on the local date parts,
-        // then set the local hours and minutes.
-        const date = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes);
+        // Create a new Date object based on the provided date object (which has correct TZ info),
+        // then set the hours and minutes for that specific slot.
+        const date = new Date(forDate.getTime());
+        date.setHours(hours, minutes, 0, 0);
 
         return {
             id: `${index + 1}`,
@@ -49,22 +47,23 @@ function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
 
 function generateTimeSlots(startTime: number, endTime: number, duration: number, forDate: Date): string[] {
     const slots: string[] = [];
+    
+    // The forDate already has the correct date and timezone info from the client.
+    // We create start and end markers for our loop.
+    const startDate = new Date(forDate.getTime());
+    startDate.setHours(startTime, 0, 0, 0);
 
-    // Create start and end dates in local time based on the provided date and hours
-    const startDate = new Date(forDate.getFullYear(), forDate.getMonth(), forDate.getDate(), startTime);
-
-    const endDate = new Date(forDate.getFullYear(), forDate.getMonth(), forDate.getDate(), endTime);
-
+    const endDate = new Date(forDate.getTime());
+    endDate.setHours(endTime, 0, 0, 0);
+    
     let current = new Date(startDate);
 
     while (current.getTime() < endDate.getTime()) {
-        // Format the time in HH:mm format based on local time
         const hours = current.getHours().toString().padStart(2, '0');
         const minutes = current.getMinutes().toString().padStart(2, '0');
         slots.push(`${hours}:${minutes}`);
         
-        // Increment current time by the duration
-        current = new Date(current.getTime() + duration * 60000);
+        current.setMinutes(current.getMinutes() + duration);
     }
     return slots;
 }
@@ -78,21 +77,19 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
   // and maintain the correct point in time, including timezone offset.
   const roomDate = data?.date ? new Date(data.date) : new Date();
 
-  // We no longer create a "clean" date object here, as it was causing timezone issues.
-  // Instead, we pass the original `roomDate` object, which has the correct timezone info from the client.
-
   if (data?.timeStrings && data.timeStrings.length > 0) {
-    // This path is for default room creation.
     timeSlots = createTimeSlots(data.timeStrings, roomDate);
   } else if (data?.timeRange && data.duration) {
     const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, roomDate);
+    // When creating time slots from generated strings, we must use the same roomDate
+    // to ensure the timezone context is preserved.
     timeSlots = createTimeSlots(timeStrings, roomDate);
   } else {
     // Default room creation
     timeSlots = createTimeSlots(defaultTimeStrings, roomDate);
   }
   
-  // To store the date part, we format it based on the client's original date object.
+  // To store just the date part, we format it based on the client's original date object.
   // We need to construct the YYYY-MM-DD string manually to avoid timezone shifts.
   const year = roomDate.getFullYear();
   const month = (roomDate.getMonth() + 1).toString().padStart(2, '0');
