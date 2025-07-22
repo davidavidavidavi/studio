@@ -1,4 +1,4 @@
-Y
+
 'use server'
 
 import { redirect } from 'next/navigation'
@@ -9,7 +9,7 @@ import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion,
 // Define types
 export interface TimeSlot {
   id: string;
-  time: string; // Stored as local time string, e.g., '09:00'
+  time: string; // Stored as full ISO 8601 string, e.g., '2024-07-23T09:00:00.000Z'
   selections: number;
   voters: string[];
 }
@@ -27,13 +27,18 @@ const defaultTimeStrings: string[] = [
     '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
 
-// Function to create time slots from strings like '09:00'
+// Function to create time slots with full ISO strings
 function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
     return timeStrings.map((time, index) => {
-        // No Date object needed; just store the local time string
+        const [hours, minutes] = time.split(':').map(Number);
+        
+        // Create a new date object for each slot based on the provided `forDate`
+        const slotDate = new Date(forDate);
+        slotDate.setHours(hours, minutes, 0, 0);
+
         return {
             id: `${index + 1}`,
-            time: time, // Store as local time string
+            time: slotDate.toISOString(), // Store as full ISO string in UTC
             selections: 0,
             voters: [],
         };
@@ -80,6 +85,7 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
   const roomDate = data?.date ? new Date(data.date) : new Date();
 
   if (data?.timeStrings && data.timeStrings.length > 0) {
+    // This path is likely unused now but kept for safety.
     timeSlots = createTimeSlots(data.timeStrings, roomDate);
   } else if (data?.timeRange && data.duration) {
     const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, roomDate);
@@ -88,7 +94,8 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
     timeSlots = createTimeSlots(timeStrings, roomDate);
   } else {
     // Default room creation
-    timeSlots = createTimeSlots(defaultTimeStrings, roomDate);
+    const timeStrings = generateTimeSlots(9, 17, 30, roomDate);
+    timeSlots = createTimeSlots(timeStrings, roomDate);
   }
 
   // To store just the date part, we must format it according to the user's original timezone
