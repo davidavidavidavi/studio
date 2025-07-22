@@ -17,5 +17,12 @@ export default function Home() {
         <JoinRoomForm />
       </div>
     </main>
+    <div className="w-full flex justify-center mt-8">
+      <a href="/admin">
+        <button className="bg-primary text-primary-foreground px-6 py-3 rounded-md font-bold text-lg shadow hover:bg-primary/90 transition-colors">
+          Admin
+        </button>
+      </a>
+    </div>
   );
 }

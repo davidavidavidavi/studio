@@ -1,10 +1,10 @@
-
+Y
 'use server'
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion, arrayRemove, getDocs, deleteDoc } from 'firebase/firestore';
 
 // Define types
 export interface TimeSlot {
@@ -165,4 +165,11 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
     console.error("Transaction failed: ", e);
     return { success: false, message: 'An error occurred while voting.' };
   }
+}
+
+export async function clearAllRooms() {
+  const snapshot = await getDocs(roomsCollection);
+  const deletions = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
+  await Promise.all(deletions);
+  return { success: true };
 }
