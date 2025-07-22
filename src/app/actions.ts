@@ -33,6 +33,7 @@ function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
 
     return timeStrings.map((time, index) => {
         const [hours, minutes] = time.split(':').map(Number);
+        
         const date = new Date(today);
         date.setHours(hours, minutes, 0, 0);
 
@@ -47,13 +48,11 @@ function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
 
 function generateTimeSlots(startTime: number, endTime: number, duration: number, forDate: Date): string[] {
     const slots: string[] = [];
-    const today = forDate;
-    today.setSeconds(0,0);
 
-    const startDate = new Date(today);
+    const startDate = new Date(forDate);
     startDate.setHours(startTime, 0, 0, 0);
 
-    const endDate = new Date(today);
+    const endDate = new Date(forDate);
     endDate.setHours(endTime, 0, 0, 0);
 
     let current = new Date(startDate);
@@ -62,8 +61,10 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number,
         const slotEnd = new Date(current.getTime() + duration * 60000);
         if (slotEnd.getTime() > endDate.getTime()) break;
         
-        const hours = current.getHours().toString().padStart(2, '0');
-        const minutes = current.getMinutes().toString().padStart(2, '0');
+        // We generate the string representation in UTC to be stored,
+        // the client will format it to local time.
+        const hours = current.getUTCHours().toString().padStart(2, '0');
+        const minutes = current.getUTCMinutes().toString().padStart(2, '0');
         slots.push(`${hours}:${minutes}`);
         current = slotEnd;
     }
@@ -75,20 +76,31 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
   const roomRef = doc(roomsCollection, upperCasePin);
   
   let timeSlots: TimeSlot[];
+  // The date string from the client includes timezone info.
+  // new Date() will correctly parse it into a Date object representing that point in time.
   const roomDate = data?.date ? new Date(data.date) : new Date();
 
+  // We want to preserve the YYYY-MM-DD from the user's local perspective for display purposes.
+  const localDate = new Date(roomDate.getFullYear(), roomDate.getMonth(), roomDate.getDate());
+
+
   if (data?.timeStrings && data.timeStrings.length > 0) {
-    timeSlots = createTimeSlots(data.timeStrings, roomDate);
+    // This path is used for default room creation, let's make it use local time too.
+    const forDate = new Date(localDate);
+    timeSlots = createTimeSlots(data.timeStrings, forDate);
   } else if (data?.timeRange && data.duration) {
-    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, roomDate);
-    timeSlots = createTimeSlots(timeStrings, roomDate);
+    const forDate = new Date(localDate);
+    const timeStrings = generateTimeSlots(data.timeRange[0], data.timeRange[1], data.duration, forDate);
+    timeSlots = createTimeSlots(timeStrings, forDate);
   } else {
-    timeSlots = createTimeSlots(defaultTimeStrings, roomDate);
+    // Default room creation
+    const forDate = new Date(localDate);
+    timeSlots = createTimeSlots(defaultTimeStrings, forDate);
   }
   
   const newRoom: Room = {
     pin: upperCasePin,
-    date: roomDate.toISOString().split('T')[0], // Store date as YYYY-MM-DD
+    date: localDate.toISOString().split('T')[0], // Store just the date part, e.g., '2024-07-25'
     timeSlots,
   };
 

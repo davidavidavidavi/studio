@@ -187,6 +187,7 @@ export default function JoinRoomForm() {
                           selected={field.value}
                           onSelect={field.onChange}
                           initialFocus
+                          disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))}
                         />
                       </PopoverContent>
                     </Popover>
@@ -199,7 +200,7 @@ export default function JoinRoomForm() {
                 name="timeRange"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Time Range (24h format)</FormLabel>
+                    <FormLabel>Time Range (local time)</FormLabel>
                     <FormControl>
                       <Slider
                         value={field.value}
