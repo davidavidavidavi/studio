@@ -27,24 +27,34 @@ const defaultTimeStrings: string[] = [
     '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
 ];
 
+// Function to create time slots from strings like '09:00'
 function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
     return timeStrings.map((time, index) => {
         const [hours, minutes] = time.split(':').map(Number);
-        
-        // Create a new Date object based on the provided date object, which has the correct timezone info.
-        // We set the hours and minutes for this specific slot in the user's local timezone.
-        const date = new Date(forDate);
-        date.setHours(hours, minutes, 0, 0);
+
+        // Create a new Date object for the specific time slot in the user's local time zone
+        // by using the year, month, and day from forDate (interpreted in the user's local time)
+        // and the hours and minutes from the timeString.
+        const localDate = new Date(
+            forDate.getFullYear(),
+            forDate.getMonth(),
+            forDate.getDate(),
+            hours,
+            minutes,
+            0,
+            0
+        );
 
         return {
             id: `${index + 1}`,
-            time: date.toISOString(), // Store as ISO string (UTC)
+            time: localDate.toISOString(), // Store as ISO string (UTC)
             selections: 0,
             voters: [],
         };
     });
 }
 
+// Function to generate time strings based on a time range and duration
 function generateTimeSlots(startTime: number, endTime: number, duration: number, forDate: Date): string[] {
     const slots: string[] = [];
 
@@ -55,7 +65,7 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number,
     // Create an end marker.
     const endDate = new Date(forDate);
     endDate.setHours(endTime, 0, 0, 0);
-    
+
     // If the end time is before the start time (e.g., 9pm to 2am), it spans across midnight.
     if (endDate <= current) {
       endDate.setDate(endDate.getDate() + 1);
@@ -66,7 +76,7 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number,
         const hours = current.getHours().toString().padStart(2, '0');
         const minutes = current.getMinutes().toString().padStart(2, '0');
         slots.push(`${hours}:${minutes}`);
-        
+
         // Increment by the duration.
         current.setMinutes(current.getMinutes() + duration);
     }
@@ -77,7 +87,7 @@ function generateTimeSlots(startTime: number, endTime: number, duration: number,
 export async function createRoom(pin: string, data?: { timeRange?: [number, number], duration?: number, timeStrings?: string[], date?: string }) {
   const upperCasePin = pin.toUpperCase();
   const roomRef = doc(roomsCollection, upperCasePin);
-  
+
   let timeSlots: TimeSlot[];
   // The date string from the client is an ISO string. new Date() will parse it
   // and maintain the correct point in time, including timezone offset. This is critical.
@@ -94,7 +104,7 @@ export async function createRoom(pin: string, data?: { timeRange?: [number, numb
     // Default room creation
     timeSlots = createTimeSlots(defaultTimeStrings, roomDate);
   }
-  
+
   // To store just the date part, we must format it according to the user's original timezone
   // to prevent the date from shifting. We extract Y/M/D from the original date object.
   const year = roomDate.getFullYear();
@@ -120,7 +130,7 @@ export async function getRoom(pin: string): Promise<Room | null> {
     if (roomSnap.exists()) {
         return roomSnap.data() as Room;
     }
-    
+
     return null;
 }
 
@@ -138,7 +148,7 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
       }
 
       const roomData = roomDoc.data() as Room;
-      
+
       const timeSlotIndex = roomData.timeSlots.findIndex(ts => ts.id === timeSlotId);
       if (timeSlotIndex === -1) {
         throw "Time slot not found!";
@@ -146,7 +156,7 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
 
       const newTimeSlots = [...roomData.timeSlots];
       const timeSlot = newTimeSlots[timeSlotIndex];
-      
+
       const userHasVotedForSlot = timeSlot.voters?.includes(userId);
       hasVoted = !userHasVotedForSlot; // This will be the new voted state
 
