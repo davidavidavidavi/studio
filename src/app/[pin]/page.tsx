@@ -6,7 +6,7 @@ import TimeSlotCard from '@/components/time-slot-card';
 import { Badge } from '@/components/ui/badge';
 import { Users, HandMetal, Calendar as CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 export async function generateMetadata({ params }: { params: { pin: string } }): Promise<Metadata> {
   return {
@@ -36,8 +36,9 @@ export default async function RoomPage({ params }: { params: { pin: string } }) 
   const totalSelections = room.timeSlots.reduce((sum, slot) => sum + slot.selections, 0);
   const duration = calculateDuration(room.timeSlots);
   
-  // The date is stored as 'YYYY-MM-DD'. We need to add a time part to parse it correctly as a local date.
-  const roomDate = new Date(`${room.date}T00:00:00`);
+  // The date is stored as 'YYYY-MM-DD'. We use parseISO to correctly handle it
+  // without timezone issues that `new Date()` can introduce.
+  const roomDate = parseISO(`${room.date}T00:00:00`);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
