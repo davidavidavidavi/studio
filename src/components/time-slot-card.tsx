@@ -16,6 +16,7 @@ interface TimeSlotCardProps {
 
 // A simple way to get a unique-ish ID for the user
 function getUserId() {
+  if (typeof window === 'undefined') return '';
   let userId = localStorage.getItem('freakmeet-userId');
   if (!userId) {
     userId = crypto.randomUUID();
@@ -38,49 +39,55 @@ export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardPr
     
     if (timeSlot.voters?.includes(currentUserId)) {
       setHasVoted(true);
+    } else {
+      setHasVoted(false);
     }
     
     // Format time on client-side to use local timezone
     const startTime = new Date(timeSlot.time);
     const endTime = new Date(startTime.getTime() + duration * 60000);
     
-    const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
-    const formattedStartTime = startTime.toLocaleTimeString([], options);
-    const formattedEndTime = endTime.toLocaleTimeString([], options);
-    
-    setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
+    const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+    // To reliably get local time string, we need to ensure the browser environment is available
+    if (typeof window !== 'undefined') {
+      const formattedStartTime = startTime.toLocaleTimeString(navigator.language, options);
+      const formattedEndTime = endTime.toLocaleTimeString(navigator.language, options);
+      setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
+    } else {
+       setDisplayTime('Loading...');
+    }
     
     setIsLoading(false);
-  }, [pin, timeSlot.id, timeSlot.time, timeSlot.voters, duration]);
+  }, [timeSlot.voters, timeSlot.time, duration]);
 
 
   const handleSelect = () => {
-    if (hasVoted || isPending || isLoading) return;
+    if (isPending || isLoading) return;
 
     startTransition(async () => {
       const result = await selectTimeSlot(pin, timeSlot.id, userId);
       if (result.success) {
-        setHasVoted(true); // Visually update immediately
+        setHasVoted(result.voted ?? false);
       }
     });
   };
-
+  
   const getCardColor = (selections: number, voted: boolean) => {
-    if (voted) return 'bg-secondary/70';
+    if (voted) return 'bg-primary text-primary-foreground';
     if (selections === 0) return 'bg-card/80 hover:bg-card';
-    if (selections <= 2) return 'bg-accent/30 hover:bg-accent/40';
-    if (selections <= 5) return 'bg-accent/60 hover:bg-accent/70';
-    if (selections <= 9) return 'bg-primary/70 hover:bg-primary/80';
-    return 'bg-primary hover:bg-primary/90';
+    if (selections <= 2) return 'bg-accent/40 hover:bg-accent/50';
+    if (selections <= 5) return 'bg-accent/70 hover:bg-accent/80';
+    if (selections <= 9) return 'bg-secondary/70 hover:bg-secondary/80';
+    return 'bg-secondary hover:bg-secondary/90';
   };
   
   const getTextColor = (selections: number, voted: boolean) => {
-    if (voted) return 'text-secondary-foreground';
-    if (selections > 5) return 'text-primary-foreground';
+    if (voted) return 'text-primary-foreground';
+    if (selections > 5) return 'text-secondary-foreground';
     return 'text-card-foreground';
   }
 
-  const isDisabled = hasVoted || isPending || isLoading;
+  const isDisabled = isPending || isLoading;
 
   return (
     <Card

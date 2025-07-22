@@ -4,7 +4,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, runTransaction, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 // Define types
 export interface TimeSlot {
@@ -127,24 +127,30 @@ export async function selectTimeSlot(pin: string, timeSlotId: string, userId: st
       }
 
       const timeSlot = roomData.timeSlots[timeSlotIndex];
-      if (timeSlot.voters?.includes(userId)) {
-        // User has already voted for this slot, so we do nothing.
-        return;
-      }
-      
-      // Create a new array with the updated timeslot
       const newTimeSlots = [...roomData.timeSlots];
-      newTimeSlots[timeSlotIndex] = {
-        ...timeSlot,
-        selections: timeSlot.selections + 1,
-        voters: [...(timeSlot.voters || []), userId]
-      };
+      const hasVoted = timeSlot.voters?.includes(userId);
+
+      if (hasVoted) {
+        // User has already voted, so un-vote
+        newTimeSlots[timeSlotIndex] = {
+          ...timeSlot,
+          selections: timeSlot.selections - 1,
+          voters: timeSlot.voters.filter(voterId => voterId !== userId)
+        };
+      } else {
+        // User has not voted, so add vote
+        newTimeSlots[timeSlotIndex] = {
+          ...timeSlot,
+          selections: timeSlot.selections + 1,
+          voters: [...(timeSlot.voters || []), userId]
+        };
+      }
 
       transaction.update(roomRef, { timeSlots: newTimeSlots });
     });
 
     revalidatePath(`/${pin}`);
-    return { success: true };
+    return { success: true, voted: !hasVoted };
   } catch (e) {
     console.error("Transaction failed: ", e);
     return { success: false, message: 'An error occurred while voting.' };
