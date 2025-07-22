@@ -1,0 +1,20 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{roomId} {
+      // Anyone can read a room's data.
+      allow read: if true;
+      
+      // Anyone can create a new room.
+      allow create: if true;
+      
+      // Only allow updating the timeSlots field for voting.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['timeSlots']);
+      
+      // Prevent deletion of rooms.
+      allow delete: if false;
+    }
+  }
+}
