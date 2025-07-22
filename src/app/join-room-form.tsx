@@ -24,6 +24,16 @@ const timeSlotsSchema = z.object({
   duration: z.number().min(5, "Duration must be at least 5 minutes.").max(120, "Duration can be at most 120 minutes."),
 });
 
+function generatePin(): string {
+  let pin;
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ123456789';
+  pin = '';
+  for (let i = 0; i < 4; i++) {
+      pin += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pin;
+}
+
 export default function JoinRoomForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -50,7 +60,8 @@ export default function JoinRoomForm() {
 
   function onTimeSlotsSubmit(values: z.infer<typeof timeSlotsSchema>) {
     startTransition(async () => {
-      await createRoom(values);
+      const pin = generatePin();
+      await createRoom(pin, values);
     });
   }
   
@@ -60,7 +71,8 @@ export default function JoinRoomForm() {
   
   const handleCreateDefaultRoom = () => {
     startTransition(async () => {
-      await createRoom();
+      const pin = generatePin();
+      await createRoom(pin);
     });
   }
   
