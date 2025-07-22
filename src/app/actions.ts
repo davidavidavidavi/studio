@@ -104,14 +104,7 @@ export async function getRoom(pin: string): Promise<Room | null> {
     if (rooms.has(upperCasePin)) {
         return rooms.get(upperCasePin)!;
     }
-    // For this demo, we'll create a room if one with the PIN doesn't exist.
-    // In a production app, you would likely return null and show a 404 page.
-    const newRoom: Room = {
-      pin: upperCasePin,
-      timeSlots: createTimeSlots(defaultTimeStrings)
-    };
-    rooms.set(upperCasePin, newRoom);
-    return newRoom;
+    return null;
 }
 
 
