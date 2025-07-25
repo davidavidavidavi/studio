@@ -22,11 +22,6 @@ export interface Room {
 
 const roomsCollection = collection(db, 'rooms');
 
-const defaultTimeStrings: string[] = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
-    '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
-];
-
 // Function to create time slots with full ISO strings
 function createTimeSlots(timeStrings: string[], forDate: Date): TimeSlot[] {
     return timeStrings.map((time, index) => {
@@ -178,5 +173,6 @@ export async function clearAllRooms() {
   const snapshot = await getDocs(roomsCollection);
   const deletions = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
   await Promise.all(deletions);
+  revalidatePath('/');
   return { success: true };
 }

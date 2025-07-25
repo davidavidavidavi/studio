@@ -12,7 +12,6 @@ interface TimeSlotCardProps {
   pin: string;
   timeSlot: TimeSlot;
   duration: number; // Duration of the slot in minutes
-  roomDate: Date; // Add this prop to get the correct date for the slot
 }
 
 // A simple way to get a unique-ish ID for the user
@@ -26,7 +25,7 @@ function getUserId() {
   return userId;
 }
 
-export default function TimeSlotCard({ pin, timeSlot, duration, roomDate }: TimeSlotCardProps) {
+export default function TimeSlotCard({ pin, timeSlot, duration }: TimeSlotCardProps) {
   const [isPending, startTransition] = useTransition();
   const [hasVoted, setHasVoted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,29 +36,39 @@ export default function TimeSlotCard({ pin, timeSlot, duration, roomDate }: Time
   useEffect(() => {
     const currentUserId = getUserId();
     setUserId(currentUserId);
-    
-    if (timeSlot.voters?.includes(currentUserId)) {
-      setHasVoted(true);
-    } else {
-      setHasVoted(false);
+    setHasVoted(timeSlot.voters?.includes(currentUserId) ?? false);
+
+    // timeSlot.time is a full ISO string. We can parse it directly.
+    const startTime = new Date(timeSlot.time);
+    if (isNaN(startTime.getTime())) {
+      setDisplayTime('Invalid Date');
+      setIsLoading(false);
+      return;
     }
-    
-    // Use roomDate for the correct day
-    const [hours, minutes] = timeSlot.time.split(':').map(Number);
-    const startTime = new Date(roomDate.getFullYear(), roomDate.getMonth(), roomDate.getDate(), hours, minutes, 0, 0);
+
     const endTime = new Date(startTime.getTime() + duration * 60000);
     
+    // Use the user's local timezone for formatting.
     const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
-    if (typeof window !== 'undefined') {
-      const formattedStartTime = startTime.toLocaleTimeString(navigator.language, options);
-      const formattedEndTime = endTime.toLocaleTimeString(navigator.language, options);
-      setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
+    const formattedStartTime = startTime.toLocaleTimeString(navigator.language, options);
+    const formattedEndTime = endTime.toLocaleTimeString(navigator.language, options);
+    
+    // Check if the end time is on a different day
+    if (startTime.getDate() !== endTime.getDate()) {
+        const endOptions: Intl.DateTimeFormatOptions = {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+        };
+        setDisplayTime(`${formattedStartTime} - ${endTime.toLocaleTimeString(navigator.language, endOptions)}`);
     } else {
-       setDisplayTime('Loading...');
+        setDisplayTime(`${formattedStartTime} - ${formattedEndTime}`);
     }
     
     setIsLoading(false);
-  }, [timeSlot.voters, timeSlot.time, duration, roomDate]);
+  }, [timeSlot, duration]);
 
 
   const handleSelect = () => {
